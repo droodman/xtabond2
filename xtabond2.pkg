@@ -60,7 +60,7 @@ f xtabond2.ado
 f xtabond2.mata
 f xtabond2.hlp
 f xtab2_p.ado
-f ../l/lxtabond2.mlib
-f ../a/abest.do
-f ../b/bbest.do
-f ../g/Greene.do
+f lxtabond2.mlib
+f abest.do
+f bbest.do
+f Greene.do
