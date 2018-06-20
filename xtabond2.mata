@@ -58,19 +58,19 @@ real scalar xtabond2_mata() {
 	string rowvector VarlistNames, Xnames, InstOptTxt, ClustVars
 	string matrix Stripe, ZGMMnames, ZIVnames, eigenvectorBasisNames
 	real colvector p, p_IV, p_GMM, p_AllIV, p_AllGMM, p_System, touseVar, idVar, tVar0, tVar, SortByIDEq, SortByEqID, ErrorEq, nottouse, Fill, touse, Complete,
-		wt, wt0, _wt, wtvar, ideqt
+		wt, wt0, _wt, wtvar, ideqt, Xiota
 	struct ClustInfo colvector clusts
 	pointer(real rowvector) matrix InstOptInd
-	real rowvector TiMinMax, DFm_keep, mz, passthru, equation, collapse, orthogonal, keep, eigenvalues
+	real rowvector TiMinMax, mz, passthru, equation, collapse, orthogonal, eigenvalues
 	pointer(struct GMMinst scalar) GMM, GMMinsts
 	pointer (struct IVinst scalar) IV, IVinsts
 	real colvector e1, e2, b1, b2, Ze, ZeDiffSargan, ARz, ARp, A1diag, Xcons, b
 	real matrix S, D, ZXi, Z, Zi, A1Ze, A2Ze, H, V1, V2, A1, A2, App, V1robust, V2robust, XZA, VXZA, m2VZXA,
 		  diffsargans, X, Y, ZX, ZXp, ZY, laglimits, V
-	real scalar c, i, sig2, g, sarganDF, sargan, sarganp, hansen, hansenp, DFm, DFr, F, Fp, Wald, Waldp
+	real scalar c, i, sig2, g, sarganDF, sargan, sarganp, hansen, hansenp, DFm, DFr, F, Fp, chi2, chi2p
 	pointer (real matrix) pA, pV, pVrobust
-	pointer (real matrix) colvector pei, pZe1i
-	pointer (real colvector) pe, pwe
+	pointer (real matrix) colvector pei, pZe1i, pX
+	pointer (real colvector) pe, pwe, ptouse
 	pointer (real matrix function) pfnXform
 
 	pragma unset NIVOptions; pragma unset NGMMOptions; pragma unset j_GMM; pragma unset Z_IV; pragma unset InstOptTxt
@@ -302,15 +302,10 @@ real scalar xtabond2_mata() {
 	_editmissing(Y, 0)
 	_editmissing(Z_IV, 0)
 
-	k = cols(keep = _rmcoll(X, consopt, 1, Xnames))
+	k = rank(X)
 	if (k == 0) {
 		printf("{err}No regressors.\n")
 		return (481)
-	}
-
-	if (k < cols(X)) {
-		Xnames = Xnames[keep]
-		X = X[, keep]
 	}
 
 	NObsEff = NObs = sum(tmp = colshape(touse[|SystemHeight-NT+1 \ .|], T))
@@ -563,25 +558,21 @@ real scalar xtabond2_mata() {
 		sig2 = sig2 * tmp
 	}
 
-	// In case constant is in column space of X, even despite noconstant, bump it out for F/Wald test
-	DFm_keep = _rmcoll(SystemGMM? 		// for system GMM, drop difference equation from model fit test
-					X[SortByEqID[|NT+1 \ .|], .] :
-					X,
-					consopt, 0)
-	if (cols(DFm_keep) > consopt) {
-		DFm = cols(DFm_keep = DFm_keep[|.\cols(DFm_keep)-consopt|])
-		b2 = b[DFm_keep]
-		if (DFm)
-			if (small)
-				Fp = Ftail(DFm, DFr = (onestepnonrobust? NObsEff - DFm : (rows(clusts)? MinNClust : NGroups)) - consopt,
-						    F   = quadcross(b2, invsym(V[DFm_keep', DFm_keep])) * b2 / DFm)
-			else
-				Waldp = chi2tail(DFm, Wald = quadcross(b2, invsym(V[DFm_keep', DFm_keep])) * b2)
-	} else {
-		DFm = 0
-		if (small) 
-			DFr = (onestepnonrobust? NObsEff : (rows(clusts)? MinNClust : NGroups)) - consopt
+	pX = SystemGMM? &(X[tmp = SortByEqID[|NT+1 \ .|], .]) : &X  // for system GMM, drop difference equation from model fit test
+	DFm = rank(*pX) - consopt
+	if (!consopt) { // In case constant is in column space of X, even despite noconstant, bump it out for F/chi2 test
+		ptouse = SystemGMM? &(touse[tmp]) : &touse
+		Xiota = cross(*pX, *ptouse)
+		DFm = DFm - mreldif(Xiota ' invsym(cross(X,X)) * Xiota, colsum(*ptouse)) < epsilon(1)*rows(*pX)
 	}
+	if (DFm)
+		if (small)
+			Fp = Ftail(DFm, DFr = (onestepnonrobust? NObsEff - DFm : (rows(clusts)? MinNClust : NGroups)) - consopt,
+															 F = quadcross(b, invsym(V)) * b / DFm)
+		else
+			chi2p = chi2tail(DFm, chi2 = quadcross(b, invsym(V)) * b)
+	else if (small) 
+			DFr = (onestepnonrobust? NObsEff : (rows(clusts)? MinNClust : NGroups)) - consopt
 
 	if (diffsargan & !pca) {
 		diffsargans = J(5, NDiffSargans, .)
@@ -609,11 +600,11 @@ real scalar xtabond2_mata() {
 	}
 
 	_ARTests(arlevels, artests, onestepnonrobust, h, N, T, NT, SystemHeight, RowsPerGroup, sig2, orthogonal, SystemGMM, j, j_IV, j_GMM, touse, SortByEqID, Complete,
-	           X, X0, Y0, Z_IV, Z_GMM, b, weights, wt, wt0, pe, pei, ARz, ARp, SubscriptsStep, SubscriptsStart, GMMinsts, ZGMMnames, tsfmt, tmin, tdelta, m2VZXA, keep, pV)
+	           X, X0, Y0, Z_IV, Z_GMM, b, weights, wt, wt0, pe, pei, ARz, ARp, SubscriptsStep, SubscriptsStart, GMMinsts, ZGMMnames, tsfmt, tmin, tdelta, m2VZXA, pV)
 
 	st_local("b", bname=st_tempname())
 	st_matrix(bname, b')
-	Stripe = J(k, 1, ""), Xnames'
+	Stripe = J(cols(Xnames), 1, ""), Xnames'
 	st_matrixcolstripe(bname, Stripe)
 	st_local("V", Vname=st_tempname())
 	st_matrix(Vname, V)
@@ -678,8 +669,8 @@ real scalar xtabond2_mata() {
 		st_numscalar("e(df_r)", DFr)
 		st_global("e(small)", "small")
 	} else {
-		st_numscalar("e(chi2)", Wald)
-		st_numscalar("e(chi2p)", Waldp)
+		st_numscalar("e(chi2)", chi2)
+		st_numscalar("e(chi2p)", chi2p)
 	}
 
 	st_numscalar("e(g_avg)", NObs / NGroups)
@@ -1103,7 +1094,7 @@ void _ARTests	(real scalar arlevels, real scalar artests, real scalar onestepnon
 								 real matrix X, real matrix X0, real colvector Y0, real matrix Z_IV, real matrix Z_GMM, real colvector b, real scalar weights, real colvector wt, real colvector wt0, 
 								 pointer (real colvector) pe, pointer (real matrix) colvector pei, real colvector ARz, real colvector ARp, real matrix SubscriptsStep, real matrix SubscriptsStart,
 								 pointer(struct GMMinst scalar) GMMinsts, string matrix ZGMMnames, string scalar tsfmt, real scalar tmin, real scalar tdelta, real matrix m2VZXA,
-								 real rowvector keep, pointer (real matrix) pV) {
+								 pointer (real matrix) pV) {
 
 	real colvector p, touse2, w, wl, ZHw, _wt, wli
 	real matrix H, psit, psiw, sum_wwli, Subscripts, tmp
@@ -1117,7 +1108,7 @@ void _ARTests	(real scalar arlevels, real scalar artests, real scalar onestepnon
 	}
 	touse2 = colshape(SystemGMM? touse[p = SortByEqID[|arlevels? NT+1 \ SystemHeight : . \ NT|]] : touse, T)'
 	if (orthogonal & arlevels == 0) { // Get residuals in first differences for AR() test
-		wl = _Difference(Y0 - (X0 = X0[, keep]) * b, N, T, NT, Complete, 0)
+		wl = _Difference(Y0 - X0 * b, N, T, NT, Complete, 0)
 		pX = &_Difference(X0, N, T, NT, Complete, 0)
 		if (weights) {
 			pX = &(*pX :* wt0)
@@ -1356,42 +1347,6 @@ real matrix _MakeGMMinsts(real scalar N, real scalar T, real scalar NT, real sca
 		GMM = GMM->next
 	}
 	return (Z)
-}
-
-real rowvector _rmcoll(real matrix X, real scalar hascons, real scalar nocons, | string rowvector varnames) {
-	real rowvector keep; real matrix U, t; real rowvector means; real colvector diag; real scalar i, jkeep; pointer(real matrix) scalar pX
-
-	if (cols(X)<=1)
-		return (cols(X))
-
-	if (rows(X)) {
-		if (nocons) {
-			if (hascons) {
-				t = X[,cols(X)]
-				pX = &(X - quadcross(X, t)'/sum(t) # t) // partial out constant term, which in Sys GMM has both 0's and 1's, to prevent it being picked for dropping 
-			} else
-				pX = &X
-			U = quadcross(*pX, *pX)
-		} else {
-			means = mean(X)
-			U = quadcrossdev(X, means, X, means)
-		}
-
-		if (hascons) U = U[|.,. \ cols(U)-1,cols(U)-1|]
-		diag = sqrt(diagonal(U))
-		U = (U :/ diag) :/ diag' // normalize
-		_edittozero(U = diagonal(invsym(U)), 10000)
-
-		keep = J(1, cols(X) - sum(!U), cols(X)) // if hascons=1 then last entry will default to cols(X), meaning keep constant, the last term
-		jkeep = 1
-		for (i = 1; i <= rows(U); i++)
-			if (U[i])
-				keep[jkeep++] = i
-			else if (cols(varnames))
-				printf("{txt}%s dropped due to collinearity\n", varnames[i])
-		return (keep)
-	}
-	return (.)
 }
 
 real matrix _Difference(real matrix X, real scalar N, real scalar T, real scalar NT, real colvector Complete, real scalar forward, | real scalar MissingFillValue) {
