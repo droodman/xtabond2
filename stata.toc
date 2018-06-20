@@ -1,0 +1,5 @@
+v 3
+
+d GitHub repository for archiving and developing xtabond2, by David Roodman
+
+p xtabond2 xtabond2 package
