@@ -1,12 +1,5 @@
-mata
-mata clear
-mata drop *()
-mata set matastrict on
-mata set mataoptimize on
-mata set matalnum off
-
-// Copyright David Roodman 2005-16. May be distributed free.
-// Mata code for xtabond2 version 3.6.5 26 February 2016
+// Copyright David Roodman 2005-18. May be distributed free.
+// Mata code for xtabond2 version 3.6.6 21 June 2018
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,6 +13,13 @@ mata set matalnum off
 
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+mata
+mata clear
+mata drop *()
+mata set matastrict on
+mata set mataoptimize on
+mata set matalnum off
 
 
 struct IVinst {
@@ -65,7 +65,7 @@ real scalar xtabond2_mata() {
 	pointer(struct GMMinst scalar) GMM, GMMinsts
 	pointer (struct IVinst scalar) IV, IVinsts
 	real colvector e1, e2, b1, b2, Ze, ZeDiffSargan, ARz, ARp, A1diag, Xcons, b
-	real matrix S, D, ZXi, Z, Zi, A1Ze, A2Ze, H, V1, V2, A1, A2, App, V1robust, V2robust, XZA, VXZA, m2VZXA,
+	real matrix S, D, ZXi, Z, Zi, A1Ze, A2Ze, H, V1, V2, _V, A1, A2, App, V1robust, V2robust, XZA, VXZA, m2VZXA,
 		  diffsargans, X, Y, ZX, ZXp, ZY, laglimits, V
 	real scalar c, i, sig2, g, sarganDF, sargan, sarganp, hansen, hansenp, DFm, DFr, F, Fp, chi2, chi2p
 	pointer (real matrix) pA, pV, pVrobust
@@ -391,8 +391,8 @@ real scalar xtabond2_mata() {
 		ZY = quadcross(Z_IV, Y) \ ZY
 		ZX = quadcross(Z_IV, X) \ ZX
 	}
-	S = J(j, j, 0); Zi = J(RowsPerGroup, j, 0); Subscripts = SubscriptsStart
 
+	S = J(j, j, 0); Zi = J(RowsPerGroup, j, 0); Subscripts = SubscriptsStart
 	for (i = N; i; i--) {
 		_wt = weights? sqrt(wt[|Subscripts|]) : 1
 		if (j_IV) Zi[|.,. \ .,j_IV|] = Z_IV[|Subscripts|]
@@ -587,12 +587,15 @@ real scalar xtabond2_mata() {
 			NOtherInsts = sum(A1diag[p] :!= 0)
 			if (NOtherInsts >= k & NOtherInsts < j0) { // invalid if # remaining insts < # of regressors
 				XZA = quadcross(ZXp = ZX[p,], App = invsym(S[p,p]))
-				ZeDiffSargan = _Ze(Y - X * (invsym(XZA * ZXp) * (XZA * ZY[p])), p_IV, p_GMM, N, T, NT, SystemHeight, orthogonal, RowsPerGroup, 
-						j_GMM, touse, GMMinsts, SubscriptsStart, SubscriptsStep, Z_IV, Z_GMM, tsfmt, tmin, tdelta)
-				diffsargans[2, g] = (hansen==.? sargan : hansen) - (diffsargans[1, g] = quadcross(ZeDiffSargan, App * ZeDiffSargan)) // unrestricted Sargan, and difference
-				diffsargans[3, g] = j0 - NOtherInsts                                        // # insts in group
-				diffsargans[4, g] = chi2tail(sarganDF - diffsargans[3, g], diffsargans[1, g]) // p value
-				diffsargans[5, g] = chi2tail(diffsargans[3, g], diffsargans[2, g])            // p value
+				_V = invsym(XZA * ZXp)
+				if (diag0cnt(_V)==diag0cnt(*pV)) { // as long as the restriction doesn't render any parameters unidentified
+					ZeDiffSargan = _Ze(Y - X * (_V * (XZA * ZY[p])), p_IV, p_GMM, N, T, NT, SystemHeight, orthogonal, RowsPerGroup, 
+							j_GMM, touse, GMMinsts, SubscriptsStart, SubscriptsStep, Z_IV, Z_GMM, tsfmt, tmin, tdelta)
+					diffsargans[2, g] = (hansen==.? sargan : hansen) - (diffsargans[1, g] = quadcross(ZeDiffSargan, App * ZeDiffSargan)) // unrestricted Sargan, and difference
+					diffsargans[3, g] = j0 - NOtherInsts - diag0cnt(V2)                           // # insts in group
+					diffsargans[4, g] = chi2tail(sarganDF - diffsargans[3, g], diffsargans[1, g]) // p value
+					diffsargans[5, g] = chi2tail(diffsargans[3, g], diffsargans[2, g])            // p value
+				}
 			}
 		}
 		NDiffSargans = rows(InstOptTxt = select(InstOptTxt, diffsargans[1,]' :!= .))

@@ -1,4 +1,4 @@
-*! xtabond2 3.6.5 26 February 2016
+*! xtabond2 3.6.6 21 June 2018
 *! Copyright (C) 2016 David Roodman
 
 * This program is free software: you can redistribute it and/or modify
@@ -919,6 +919,8 @@ end
 
 
 * Version history
+* 3.6.6 Stopped trying to drop collinear regressors and just compute their rank and adjust dof with that.
+*       Prevent diffsargan if removing an instrument group renders model unidentified.
 * 3.6.5 Greatly sped up svmat by using only Mata to make row stripe
 * 3.6.4 Prevented diffsargan code crash in degenerate case of System GMM with no retained gmm() instruments
 * 3.6.3 Improved collinearity detection by pre-normalizing variables
