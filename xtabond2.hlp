@@ -76,7 +76,7 @@ The syntax of {help predict} following {cmd:xtabond2} is{p_end}
 where {it:statistic} is
 
 {p 8 25 2}{cmd:xb}{space 10}bx_it, fitted values (the default){p_end}
-{p 8 25 2}{cmdab:re:siduals}{space 3}e_it, the residuals{p_end}
+{p 8 25 2}{cmdab:re:siduals}{space 3}u_it, the residuals{p_end}
 
 
 {title:Donate?}
@@ -117,7 +117,7 @@ Endogenous ones are potentially correlated with past and present errors.);{p_end
 {p 4 4 2}and E[v_i]=E[e_it]=E[v_i*e_it]=0, and E[e_it*e_js]=0 for each i, j, t, s, i<>j.{p_end}
 
 {p 4 4 2}First-differencing the equation removes the v_i, thus eliminating a potential source of omitted variable bias in estimation.
-However, differencing variables that are predetermined but not strictly exogenous makes them endogenous since the {bind:w_it} in some {bind:D.w_it = w_it – w_i,t-1} is correlated with the {bind:e_i,t-1} in {bind:D.e_it}.
+However, differencing variables that are predetermined but not strictly exogenous makes them endogenous since the {bind:w_it} in some {bind:D.w_it = w_it â€“ w_i,t-1} is correlated with the {bind:e_i,t-1} in {bind:D.e_it}.
 Following Holt-Eakin, Newey, and Rosen (1988), Arellano and Bond (1991) develop a Generalized Method of Moments estimator that instruments the differenced variables that are not strictly exogenous with all their available lags in levels.
 (Strictly exogenous variables are uncorrelated with current and past errors.) Arellano and Bond also develop an appropriate test for autocorrelation, which, if present, can render some lags invalid as instruments.{p_end}
 
@@ -129,7 +129,7 @@ Blundell and Bond show that this assumption in turn depends on a more precise on
 {p_end}
 
 {p 4 4 2}{cmd:xtabond2} implements both estimators--twice.
-The version in Stata’s ado programming language is slow but compatible with Stata 7 and 8.
+The version in Stataâ€™s ado programming language is slow but compatible with Stata 7 and 8.
 The Mata version is usually faster, and runs in Stata 10.0 or later.
 The {cmd:xtabond2} option {cmd:nomata} prevents the use of Mata even when it is available.{p_end}
 
@@ -226,7 +226,7 @@ calculated instead of the one-step.
 {p 4 8 2}{cmd:robust}: For one-step estimation, {cmd:robust} specifies that the robust estimator of the covariance matrix of the parameter estimates be calculated.
 The resulting standard error estimates are consistent in the presence of any pattern of heteroskedasticity and autocorrelation within panels.
 In two-step estimation, the standard covariance matrix is already robust in theory--but typically yields standard errors that are downward biased.
-{cmd:twostep robust} requests Windmeijer’s finite-sample correction for the two-step covariance matrix.
+{cmd:twostep robust} requests Windmeijerâ€™s finite-sample correction for the two-step covariance matrix.
 
 {p 4 8 2}{cmd:cluster(}{it:varlist}{cmd:)} overrides the default use of the panel identifier (as set by {cmd:tsset}) for
 defining clusters. It also allows multiway clustering. {cmd:cluster(}{it:varlist}{cmd:)} implies {cmd:robust} in the senses 
@@ -559,7 +559,7 @@ Panel data estimation using DPD for Ox. http://www.nuff.ox.ac.uk/Users/Doornik.{
 {p 4 8 2}Holtz-Eakin, D., W. Newey, and H.S. Rosen. 1988.
 Estimating vector autoregressions with panel data. {it: Econometrica} 56: 1371-95.{p_end}
 {p 4 8 2}Kapetanios, G., M. Marcellino. 2010. Factor-GMM estimation with large sets of possibly weak instruments.
-{it:Computational Statistics & Data Analysis} 54(11): 2655–75.{p_end}
+{it:Computational Statistics & Data Analysis} 54(11): 2655â€“75.{p_end}
 {p 4 8 2}Mehrhoff, J. 2009. A solution to the problem of too many instruments in dynamic panel data GMM. 
 Discussion Paper Series 1. No 31/2009.{p_end}
 {p 4 8 2}Roodman, D. 2009. How to Do xtabond2: An Introduction to "Difference" and "System" GMM in Stata. {it:Stata Journal} 9(1): 86-136.{p_end}
