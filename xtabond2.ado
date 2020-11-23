@@ -26,7 +26,7 @@ program define xtabond2, eclass byable(recall) sortpreserve `=cond(0`c(stata_ver
 		if _rc==0 { local varlist `r(varlist)' }
 		qui query born
 		if "`mata'"=="" {
-			if c(stata_version)' >= 11.2 {
+			if c(stata_version) >= 11.2 {
 				local cmdline xtabond2 `0'
 				tempname rc
 				mata st_numscalar("`rc'",xtabond2_mata())
