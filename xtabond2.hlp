@@ -514,7 +514,7 @@ variable from the linear prediction.
 {p 4 8 2}{cmd:* Same for next two}{p_end}
 {p 4 8 2}{stata "regress n w k"}{p_end}
 {p 4 8 2}{stata "xtabond2 n w k, iv(w k, eq(level)) small h(1)"}{p_end}
-{p 4 8 2}{cmd:* And next two, assuming xtabond updated since May 2004 with}{stata "update": update}{cmd: command.}{p_end}
+{p 4 8 2}{cmd:* And next two}{p_end}
 {p 4 8 2}{stata "xtabond n yr*, lags(1) pre(w, lags(1,.)) pre(k, endog) robust small noconstant"}{p_end}
 {p 4 8 2}{stata "xtabond2 n L.n w L.w k yr*, gmm(L.(w n k)) iv(yr*) noleveleq robust small"}{p_end}
 {p 4 8 2}{cmd:* And next two}{p_end}

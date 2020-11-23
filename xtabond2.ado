@@ -1,5 +1,5 @@
-*! xtabond2 3.6.6 21 June 2018
-*! Copyright (C) 2016 David Roodman
+*! xtabond2 3.7.0 22 November 2020
+*! Copyright (C) 2003-20 David Roodman. May be distributed free.
 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -12,22 +12,21 @@
 * GNU General Public License for more details.
 
 * You should have received a copy of the GNU General Public License
-* along with this program. If not, see <http://www.gnu.org/licenses/>.
+* along with this program. If not, see <http://www.gnu.org/licenses>.
 
 * Version history at bottom
 
 cap program drop xtabond2
 program define xtabond2, eclass byable(recall) sortpreserve `=cond(0`c(stata_version)'>=11, "properties(mi)","")'
 	version 7
-	local xtabond2_version 03.06.00
+	local xtabond2_version 03.07.00
 	if !replay() {
-		if 0`c(stata_version)'>=11 { local fv fv }
-		syntax varlist(`fv' ts) [aw pw fw] [if/] [in], [noMata Level(real $S_level) *]
+		syntax varlist(fv ts) [aw pw fw] [if/] [in], [noMata Level(real $S_level) *]
 		cap fvexpand `varlist'
 		if _rc==0 { local varlist `r(varlist)' }
 		qui query born
 		if "`mata'"=="" {
-			if $S_1>=d(25feb2008) {
+			if c(stata_version)' >= 11.2 {
 				local cmdline xtabond2 `0'
 				tempname rc
 				mata st_numscalar("`rc'",xtabond2_mata())
@@ -37,10 +36,6 @@ program define xtabond2, eclass byable(recall) sortpreserve `=cond(0`c(stata_ver
 					xtabond2_output `level'
 				}
 				exit `=`rc''
-			}
-			if $S_1 >= d(22apr2005) {
-				di as res "You need a newer version of Stata to run the fast version of xtabond2." 
-				di as res `"Type "update executable" at the Stata prompt and follow the instructions the command displays when finished."'
 			}
 		}
 		if $S_1 < d(11jun2002) {
@@ -919,6 +914,9 @@ end
 
 
 * Version history
+* 3.7.0 Require Stata 11.2 or later for Mata version. Restore _rmcoll() dropped in 3.6.6 for treatment of RHS regressors. But fix _rmcoll() bug introduced in 3.6.3 causing it to count dropped vars in Sargan/Hansen dof.
+* 3.6.8 Don't restrict sample because of missing observations in iv(, mz) instruments with -orthogonal-
+* 3.6.7 Don't post covariance matrix if it contains missing values (rare)
 * 3.6.6 Stopped trying to drop collinear regressors and just compute their rank and adjust dof with that.
 *       Prevent diffsargan if removing an instrument group renders model unidentified.
 * 3.6.5 Greatly sped up svmat by using only Mata to make row stripe

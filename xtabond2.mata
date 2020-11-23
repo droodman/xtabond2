@@ -1,5 +1,5 @@
-// Copyright David Roodman 2005-18. May be distributed free.
-// Mata code for xtabond2 version 3.6.6 21 June 2018
+*! xtabond2 3.7.0 22 November 2020
+// Copyright (C) 2005-20 David Roodman. May be distributed free.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -47,7 +47,6 @@ struct ClustInfo {
 
 
 
-
 real scalar xtabond2_mata() {
 	real scalar artests, arlevels, steps, h, consopt, r, r2, small, robust, onestepnonrobust,
 		j, j0, k, NObs, NObsEff, NGroups, diffsargan, NOtherInsts,
@@ -61,7 +60,7 @@ real scalar xtabond2_mata() {
 		wt, wt0, _wt, wtvar, ideqt, Xiota
 	struct ClustInfo colvector clusts
 	pointer(real rowvector) matrix InstOptInd
-	real rowvector TiMinMax, mz, passthru, equation, collapse, orthogonal, eigenvalues
+	real rowvector TiMinMax, mz, passthru, equation, collapse, orthogonal, eigenvalues, keep
 	pointer(struct GMMinst scalar) GMM, GMMinsts
 	pointer (struct IVinst scalar) IV, IVinsts
 	real colvector e1, e2, b1, b2, Ze, ZeDiffSargan, ARz, ARp, A1diag, Xcons, b
@@ -97,7 +96,7 @@ real scalar xtabond2_mata() {
 		printf("{err}You must {help xtset} the data to specify the panel and time variables.\n")
 		return (459)
 	}
-	tdelta = st_numscalar("c(stata_version)") >= 10 ? st_numscalar("r(tdelta)") : 1
+	tdelta = st_numscalar("r(tdelta)")
 	if ((tsfmt=st_global("r(tsfmt)")) == "%tc") tsfmt = "%9.0g"
 	
 	stata("markout "+ touseName + " " + idName)
@@ -128,6 +127,7 @@ real scalar xtabond2_mata() {
 
 	st_local("0", "," + st_local("options"))
 	stata("syntax, [Robust Cluster(varlist) TWOstep noConstant noLeveleq ORthogonal ARtests(integer 2) SMall H(integer 3) DPDS2 Level(integer $S_level) ARLevels noDiffsargan SVMat SVVar pca COMPonents(integer 0) *]")
+
 	arlevels = st_local("arlevels")!= ""
 	small = st_local("small")!= ""
 	steps = 1 + (st_local("twostep")=="twostep")
@@ -215,7 +215,7 @@ real scalar xtabond2_mata() {
 
 	rc = _ParseInsts(j_IV, j_GMM, NIVOptions, NGMMOptions, IVinsts, GMMinsts, SystemGMM, Complete, N, T, NT, idSampleName, Fill, orthogonal)
 	if (rc) return (rc)
-	
+
 	pca = pca & j_GMM
 
 	NDiffSargans = NIVOptions + NGMMOptions + SystemGMM
@@ -285,7 +285,7 @@ real scalar xtabond2_mata() {
 
 	if (favorspeed())
 		Z_GMM = _MakeGMMinsts(N, T, NT, SystemHeight, orthogonal, RowsPerGroup, j_GMM, touse, GMMinsts, ZGMMnames, tsfmt, tmin, tdelta)
-		
+
 	// Zero out excluded observations
 	nottouse = J(Nnottouse = SystemHeight - sum(touse), 1, 0)
 	r2 = Nnottouse
@@ -302,14 +302,20 @@ real scalar xtabond2_mata() {
 	_editmissing(Y, 0)
 	_editmissing(Z_IV, 0)
 
-	k = rank(X)
+	k = cols(keep = _rmcoll(X, consopt, 1, Xnames))
 	if (k == 0) {
 		printf("{err}No regressors.\n")
 		return (481)
 	}
 
-	NObsEff = NObs = sum(tmp = colshape(touse[|SystemHeight-NT+1 \ .|], T))
+  if (k < cols(X)) {
+		Xnames = Xnames[keep]
+		X = X[, keep]
+	}
+	
+  NObsEff = NObs = sum(tmp = colshape(touse[|SystemHeight-NT+1 \ .|], T))
 	NGroups = sum(rowmax(tmp))
+
 	if (weights) {
 		wttot = sum(_wt = wt[|SystemHeight-NT+1 \ .|]) // holds weight sum first for "main" eq, then for eq used to compute sig2
 		printf("(sum of weights is %f)\n", wttot)
@@ -347,7 +353,7 @@ real scalar xtabond2_mata() {
 		_edittozerotol(eigenvalues, 1e-12)
 		j_GMM = components? min((components, j_GMM)) : max((sum(eigenvalues:>.999999), k-j_IV))
 		Z_GMM = Z_GMM * eigenvectors[|.,. \ ., j_GMM|]
-		ZGMMnames = J(j_GMM, 1, ""), (stataversion()>=1100? strofreal(eigenvalues'[|.\j_GMM|], "%32.12f") : J(j_GMM, 1, " "))
+		ZGMMnames = J(j_GMM, 1, ""), strofreal(eigenvalues'[|.\j_GMM|], "%32.12f")
 	}
 	
 	if ((j = j_GMM + j_IV) < k) {
@@ -374,11 +380,12 @@ real scalar xtabond2_mata() {
 
 	Zi = J(RowsPerGroup, j_GMM, 0)
 	H = _H(h, orthogonal, orthogonal, SystemGMM, T)
+
 	if (favorspeed()) {
 		ZY = quadcross(Z_IV, Y) \ quadcross(Z_GMM, Y)
 		ZX = quadcross(Z_IV, X) \ quadcross(Z_GMM, X)
-	} else {
-		ZX = J(j_GMM, k, 0); ZY = J(j_GMM, 1, 0)
+  } else {
+		ZX = J(j_GMM, cols(X), 0); ZY = J(j_GMM, 1, 0)
 		if (j_GMM) {
 			Subscripts = SubscriptsStart
 			for (i = N; i; i--) {
@@ -486,28 +493,28 @@ real scalar xtabond2_mata() {
 		//   = sum_i (e1_i'Z_i*A2*Z'e2 + Z_i'e1_i*e2'Z*A2)Z_i'X_i
 		//   (transformation reverse engineered from DPD.)
 			if (rows(clusts)) {
-				if (SystemGMM | clusts[rows(clusts)].N!=NObs) D = J(j, k, 0)
+				if (SystemGMM | clusts[rows(clusts)].N!=NObs) D = J(j, cols(X), 0)
 				for (c=rows(clusts); c; c--)
 					if (clusts[c].N==NObs & !SystemGMM) // efficient code for clustering by obs/het-robust case
 						D = (small? clusts[c].sign*clusts[c].N/(clusts[c].N-1) : clusts[c].sign) * 2*quadcross(Z, e1 :* Z*A2Ze, X)
 					else {
-						tmp = J(j, k, 0)
+						tmp = J(j, cols(X), 0)
 						for (i=clusts[c].N; i; i--) {
 							p = clusts[c].ID:==i
 							Xi = select(X, p)
-							ZXi = (j_IV? quadcross(select(Z_IV, p), Xi) : J(0, k, 0)) \ (j_GMM? quadcross(select(Z_GMM, p), Xi) : J(0, k, 0))
+							ZXi = (j_IV? quadcross(select(Z_IV, p), Xi) : J(0, cols(X), 0)) \ (j_GMM? quadcross(select(Z_GMM, p), Xi) : J(0, cols(X), 0))
 							tmp = tmp + (*clusts[c].pZe1i[i] * A2Ze) * ZXi + quadcross(A2Ze * *clusts[c].pZe1i[i], ZXi)
 						}
 						D = D + (small? clusts[c].sign*clusts[c].N/(clusts[c].N-1) : clusts[c].sign) * tmp
 					}
 			} else {
-				D = J(j, k, 0)
+				D = J(j, cols(X), 0)
 				Subscripts = SubscriptsStart
 				for (i = N; i; i--) {
 					Xi = X[|Subscripts|]
-					ZXi = (j_IV? quadcross(Z_IV[|Subscripts|], Xi) : J(0, k, 0)) \
+					ZXi = (j_IV? quadcross(Z_IV[|Subscripts|], Xi) : J(0, cols(X), 0)) \
 					   (j_GMM? quadcross(favorspeed()? Z_GMM[|Subscripts|] :
-								_MakeGMMinsts(N, T, NT, SystemHeight, orthogonal, RowsPerGroup, j_GMM, touse, GMMinsts, ZGMMnames, tsfmt, tmin, tdelta, i), Xi) : J(0, k, 0))
+								_MakeGMMinsts(N, T, NT, SystemHeight, orthogonal, RowsPerGroup, j_GMM, touse, GMMinsts, ZGMMnames, tsfmt, tmin, tdelta, i), Xi) : J(0, cols(X), 0))
 					D = D + (*pZe1i[i] * A2Ze) * ZXi + quadcross(A2Ze * *pZe1i[i], ZXi)
 					Subscripts = Subscripts - SubscriptsStep
 				}
@@ -560,7 +567,7 @@ real scalar xtabond2_mata() {
 
 	pX = SystemGMM? &(X[tmp = SortByEqID[|NT+1 \ .|], .]) : &X  // for system GMM, drop difference equation from model fit test
 	DFm = rank(*pX) - consopt
-	if (!consopt) { // In case constant is in column space of X, even despite noconstant, bump it out for F/chi2 test
+	if (!consopt) {  // In case constant is in column space of X, even despite noconstant, bump it out for F/chi2 test
 		ptouse = SystemGMM? &(touse[tmp]) : &touse
 		Xiota = cross(*pX, *ptouse)
 		DFm = DFm - mreldif(Xiota ' invsym(cross(X,X)) * Xiota, colsum(*ptouse)) < epsilon(1)*rows(*pX)
@@ -603,7 +610,7 @@ real scalar xtabond2_mata() {
 	}
 
 	_ARTests(arlevels, artests, onestepnonrobust, h, N, T, NT, SystemHeight, RowsPerGroup, sig2, orthogonal, SystemGMM, j, j_IV, j_GMM, touse, SortByEqID, Complete,
-	           X, X0, Y0, Z_IV, Z_GMM, b, weights, wt, wt0, pe, pei, ARz, ARp, SubscriptsStep, SubscriptsStart, GMMinsts, ZGMMnames, tsfmt, tmin, tdelta, m2VZXA, pV)
+	           X, X0, Y0, Z_IV, Z_GMM, b, weights, wt, wt0, pe, pei, ARz, ARp, SubscriptsStep, SubscriptsStart, GMMinsts, ZGMMnames, tsfmt, tmin, tdelta, m2VZXA, keep, pV)
 
 	st_local("b", bname=st_tempname())
 	st_matrix(bname, b')
@@ -613,7 +620,7 @@ real scalar xtabond2_mata() {
 	st_matrix(Vname, V)
 	st_matrixcolstripe(Vname, Stripe)
 	st_matrixrowstripe(Vname, Stripe)
-	stata("est post " + bname + " " + Vname + "," + (small? "dof(" + strofreal(DFr)+")" : "") + " obs(" + strofreal(NObs) + 
+	stata("est post " + bname + " " + (hasmissing(V)? "" : Vname) + "," + (small? "dof(" + strofreal(DFr)+")" : "") + " obs(" + strofreal(NObs) + 
 				") esample(" + touseName +") depname(" + VarlistNames[1] + ")")
 
 	st_numscalar("e(sargan)", sargan)
@@ -709,7 +716,7 @@ real scalar xtabond2_mata() {
 		Stripe = J(rows(Stripe), 1, ""), Stripe
 
 		st_matrix("e(X)", X)
-		st_matrixcolstripe("e(X)", substr((J(k, 1, ""), Xnames'), 1, 32))
+		st_matrixcolstripe("e(X)", substr((J(cols(X), 1, ""), Xnames'), 1, 32))
 		st_matrixrowstripe("e(X)", Stripe)
 		st_matrix("e(Y)", Y)
 		st_matrixcolstripe("e(Y)", ("", substr(VarlistNames[1], 1, 32)))
@@ -733,7 +740,7 @@ real scalar xtabond2_mata() {
 			st_matrixrowstripe("e(Z)", Stripe)
 			if (cols(eigenvectors)) {
 				st_matrix("e(eigenvectors)", eigenvectors)
-				if (stataversion()>= 1100) st_matrixcolstripe("e(eigenvectors)", (J(cols(eigenvalues), 1, ""), strofreal(eigenvalues',"%32.12f")))
+				st_matrixcolstripe("e(eigenvectors)", (J(cols(eigenvalues), 1, ""), strofreal(eigenvalues',"%32.12f")))
 				st_matrixrowstripe("e(eigenvectors)", substr(eigenvectorBasisNames, 1, 32))
 			}
 		}
@@ -844,7 +851,7 @@ real scalar xtabond2_mata() {
 real scalar _ParseInsts(real scalar j_IV, real scalar j_GMM, real scalar NIVOptions, real scalar NGMMOptions, pointer(struct IVinst scalar) IV, 
 	pointer(struct GMMinst scalar) GMM, real scalar SystemGMM, 
 	real colvector Complete, real scalar N, real scalar T, real scalar NT, string scalar idSampleName, real colvector Fill, real scalar orthogonal) {
-	
+
 	string scalar ivstyle, gmmstyle, optionsArg, LaglimArg, EquationArg
 	string rowvector LaglimStr
 	string colvector BaseNames
@@ -864,17 +871,14 @@ real scalar _ParseInsts(real scalar j_IV, real scalar j_GMM, real scalar NIVOpti
 		next = IV; (*(IV = &(IVinst()))).next = next  // add new IVinst group to linked list
 		optionsArg = st_local("options")
 		st_local("0", ivstyle)
-		stata("capture syntax varlist(numeric ts" + (st_numscalar("c(stata_version)") >= 11 ? " fv" : "") + "), [Equation(string) Passthru MZ]")
+		stata("capture syntax varlist(numeric ts fv), [Equation(string) Passthru MZ]")
 		stata("loc _rc = _rc")
 		if (st_local("_rc") != "0") {
 			printf("{err}ivstyle(%s) invalid.\n", ivstyle)
 			return (198)
 		}
-		if (st_numscalar("c(stata_version)") >= 11) {
-			stata("fvexpand " + st_local("varlist"))
-			IV->BaseVarNames = st_global("r(varlist)")
-		} else
-			IV->BaseVarNames = st_local("varlist")
+    stata("fvexpand " + st_local("varlist"))
+    IV->BaseVarNames = st_global("r(varlist)")
 
 		st_local ("0", "," + (EquationArg = st_local("equation")))
 		EquationTokenCount = cols(tokens(EquationArg))
@@ -909,9 +913,9 @@ real scalar _ParseInsts(real scalar j_IV, real scalar j_GMM, real scalar NIVOpti
 			                          IV->ivstyle = IV->ivstyle + ")"
 			tmp = st_data(., tokens(IV->BaseVarNames), idSampleName)
 			(IV->Base = J(NT, cols(tmp), .))[Fill, .] = tmp
-
-			Complete = Complete :& !rowmissing(IV->Base)
-			j_IV = j_IV + cols(IV->Base)
+			if (IV->mz == 0)
+        Complete = Complete :& !rowmissing(IV->Base)
+			j_IV = j_IV + cols(tmp)
 		}
 		st_local("0", "," + optionsArg)
 		stata("syntax [, IVstyle(string) *]")
@@ -939,7 +943,7 @@ real scalar _ParseInsts(real scalar j_IV, real scalar j_GMM, real scalar NIVOpti
 			gmmstyle = st_local("anything")
 
 		st_local ("0", gmmstyle)
-		stata("capture syntax varlist(numeric ts" + (st_numscalar("c(stata_version)") >= 11 ? " fv" : "") + "), [Equation(string) Laglimits(string) Collapse Passthru Orthogonal]")
+		stata("capture syntax varlist(numeric ts fv), [Equation(string) Laglimits(string) Collapse Passthru Orthogonal]")
 		stata("loc _rc = _rc")
 		if (st_local("_rc") != "0") {
 			printf("{err}gmmstyle(%s) invalid.\n", gmmstyle)
@@ -949,11 +953,8 @@ real scalar _ParseInsts(real scalar j_IV, real scalar j_GMM, real scalar NIVOpti
 		GMM->collapse       = st_local("collapse") != ""
 		GMM->InstOrthogonal = st_local("orthogonal") != ""
 
-		if (stataversion()>= 1100) {
-			stata("fvexpand " + st_local("varlist"))
-			GMM->BaseVarNames = st_global("r(varlist)")
-		} else
-			GMM->BaseVarNames = st_local("varlist")
+    stata("fvexpand " + st_local("varlist"))
+    GMM->BaseVarNames = st_global("r(varlist)")
 
 		st_local ("0", "," + (EquationArg = st_local("equation")))
 		EquationTokenCount = cols(tokens(EquationArg))
@@ -1097,7 +1098,7 @@ void _ARTests	(real scalar arlevels, real scalar artests, real scalar onestepnon
 								 real matrix X, real matrix X0, real colvector Y0, real matrix Z_IV, real matrix Z_GMM, real colvector b, real scalar weights, real colvector wt, real colvector wt0, 
 								 pointer (real colvector) pe, pointer (real matrix) colvector pei, real colvector ARz, real colvector ARp, real matrix SubscriptsStep, real matrix SubscriptsStart,
 								 pointer(struct GMMinst scalar) GMMinsts, string matrix ZGMMnames, string scalar tsfmt, real scalar tmin, real scalar tdelta, real matrix m2VZXA,
-								 pointer (real matrix) pV) {
+								 real rowvector keep, pointer (real matrix) pV) {
 
 	real colvector p, touse2, w, wl, ZHw, _wt, wli
 	real matrix H, psit, psiw, sum_wwli, Subscripts, tmp
@@ -1111,7 +1112,7 @@ void _ARTests	(real scalar arlevels, real scalar artests, real scalar onestepnon
 	}
 	touse2 = colshape(SystemGMM? touse[p = SortByEqID[|arlevels? NT+1 \ SystemHeight : . \ NT|]] : touse, T)'
 	if (orthogonal & arlevels == 0) { // Get residuals in first differences for AR() test
-		wl = _Difference(Y0 - X0 * b, N, T, NT, Complete, 0)
+		wl = _Difference(Y0 - (X0 = X0[, keep]) * b, N, T, NT, Complete, 0)
 		pX = &_Difference(X0, N, T, NT, Complete, 0)
 		if (weights) {
 			pX = &(*pX :* wt0)
@@ -1350,6 +1351,38 @@ real matrix _MakeGMMinsts(real scalar N, real scalar T, real scalar NT, real sca
 		GMM = GMM->next
 	}
 	return (Z)
+}
+
+real rowvector _rmcoll(real matrix X, real scalar hascons, real scalar nocons, | string rowvector varnames) {	
+	real rowvector keep; real matrix U, t; real rowvector means; real colvector diag; real scalar i, jkeep; pointer(real matrix) scalar pX	
+	if (cols(X)<=1)	
+		return (cols(X))	
+	if (rows(X)) {	
+		if (nocons) {	
+			if (hascons) {	
+				t = X[,cols(X)]	
+				pX = &(X - quadcross(X, t)'/sum(t) # t) // partial out constant term, which in Sys GMM has both 0's and 1's, to prevent it being picked for dropping 	
+			} else
+				pX = &X	
+			U = quadcross(*pX, *pX)	
+		} else {	
+			means = mean(X)	
+			U = quadcrossdev(X, means, X, means)	
+		}	
+		if (hascons) U = U[|.,. \ cols(U)-1,cols(U)-1|]	
+		diag = editmissing(1 :/ sqrt(diagonal(U)), 0)
+		U = (U :* diag) :* diag' // normalize	
+		_edittozero(U = diagonal(invsym(U)), 10000)	
+		keep = J(1, cols(X) - sum(!U), cols(X)) // if hascons=1 then last entry will default to cols(X), meaning keep constant, the last term	
+		jkeep = 1	
+		for (i = 1; i <= rows(U); i++)	
+			if (U[i])	
+				keep[jkeep++] = i	
+			else if (cols(varnames))	
+				printf("{txt}%s dropped due to collinearity\n", varnames[i])	
+		return (keep)	
+	}	
+	return (.)	
 }
 
 real matrix _Difference(real matrix X, real scalar N, real scalar T, real scalar NT, real colvector Complete, real scalar forward, | real scalar MissingFillValue) {
