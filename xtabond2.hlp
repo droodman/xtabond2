@@ -129,8 +129,7 @@ Blundell and Bond show that this assumption in turn depends on a more precise on
 {p_end}
 
 {p 4 4 2}{cmd:xtabond2} implements both estimators--twice.
-The version in Stata’s ado programming language is slow but compatible with Stata 7 and 8.
-The Mata version is usually faster, and runs in Stata 10.0 or later.
+The version in Stata’s ado programming language is slow but compatible with old versions of Stata. The Mata version is usually faster, and runs in Stata 11.2 or later.
 The {cmd:xtabond2} option {cmd:nomata} prevents the use of Mata even when it is available.{p_end}
 
 {p 4 4 2}The Mata version also includes the option to use the forward orthogonal deviations transform instead of first differencing.
@@ -233,7 +232,7 @@ defining clusters. It also allows multiway clustering. {cmd:cluster(}{it:varlist
 just described. For example, in two-step estimation,
 it requests the Windmeijer correction. Changing the clustering with this option affects one-step "robust" standard errors, all
 two-step results, the Hansen and difference-in-Hansen tests, and the Arellano-Bond serial correlation tests. When multiway clustering is combined with {cmd:small}, 
-the finite-sample correction multiplier is a component-specific (G/(G-1)*(N-1)/(N-k), as described in Cameron, Gelbach, and Miller (2006), pp. 8-9.
+the finite-sample correction multiplier is a component-specific G/(G-1)*(N-1)/(N-k), as described in Cameron, Gelbach, and Miller (2006), pp. 8-9.
 
 {p 4 8 2}{cmd:noconstant} suppresses the constant term in the levels equation.
 By default, the term is included as a regressor and IV-style instrument.
@@ -247,7 +246,7 @@ Rather, the constant is transformed out.{p_end}
 {p 4 8 2}{cmd:nodiffsargan} prevents difference-in-Sargan/Hansen tests, which are are computationally intensive since they involve re-estimating the model for each test.
 The option has no effect on the ado version of {cmd:xtabond2}, which does not perform difference-in-Sargan/Hansen testing anyway.{p_end}
 
-{p 4 8 2}{cmd:nomata} prevents the use of Mata code even when the language is available (in Stata 10.0 or later). It is not necessary in Stata 7-9. Ordinarily this switch does not affect results.
+{p 4 8 2}{cmd:nomata} prevents the use of Mata code even when the language is available (in Stata 11.2 or later). It is not necessary in Stata 7-9. Ordinarily this switch does not affect results.
 However, if some variables are collinear or nearly so, the two versions of the program may dropped different ones, which can affect the results.
 They can even differ in how many they drop, since the versions use different routines and tolerances for determining collinearity.
 In addition, the Mata version does not perfectly handle strange and unusual expressions like {cmd:gmm(L.x, lag(-1 -1))}. (Documentation for the {cmd: gmmstyle()} option is below.)
