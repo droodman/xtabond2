@@ -1,5 +1,5 @@
-*! xtabond2 3.7.0 22 November 2020
-*! Copyright (C) 2003-20 David Roodman. May be distributed free.
+*! xtabond2 3.7.1 8 July 2024
+*! Copyright (C) 2003-24 David Roodman. May be distributed free.
 
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -914,6 +914,7 @@ end
 
 
 * Version history
+* 3.7.1 Fixed 3.6.5 bug (21 Jun 2018) causing df_m to be reported 0 for no-constant models
 * 3.7.0 Require Stata 11.2 or later for Mata version. Restore _rmcoll() dropped in 3.6.6 for treatment of RHS regressors. But fix _rmcoll() bug introduced in 3.6.3 causing it to count dropped vars in Sargan/Hansen dof.
 * 3.6.8 Don't restrict sample because of missing observations in iv(, mz) instruments with -orthogonal-
 * 3.6.7 Don't post covariance matrix if it contains missing values (rare)

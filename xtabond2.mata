@@ -1,4 +1,4 @@
-*! xtabond2 3.7.0 22 November 2020
+*! xtabond2 3.7.1 8 July 2024
 // Copyright (C) 2005-20 David Roodman. May be distributed free.
 
 // This program is free software: you can redistribute it and/or modify
@@ -567,11 +567,13 @@ real scalar xtabond2_mata() {
 
 	pX = SystemGMM? &(X[tmp = SortByEqID[|NT+1 \ .|], .]) : &X  // for system GMM, drop difference equation from model fit test
 	DFm = rank(*pX) - consopt
+
 	if (!consopt) {  // In case constant is in column space of X, even despite noconstant, bump it out for F/chi2 test
 		ptouse = SystemGMM? &(touse[tmp]) : &touse
 		Xiota = cross(*pX, *ptouse)
-		DFm = DFm - mreldif(Xiota ' invsym(cross(X,X)) * Xiota, colsum(*ptouse)) < epsilon(1)*rows(*pX)
+		DFm = DFm - (mreldif(Xiota ' invsym(cross(X,X)) * Xiota, colsum(*ptouse)) < epsilon(1)*rows(*pX))
 	}
+
 	if (DFm)
 		if (small)
 			Fp = Ftail(DFm, DFr = (onestepnonrobust? NObsEff - DFm : (rows(clusts)? MinNClust : NGroups)) - consopt,
@@ -662,6 +664,8 @@ real scalar xtabond2_mata() {
 	st_numscalar("e(g_max)", TiMinMax[2])
 	st_numscalar("e(N_g)", NGroups)
 	st_numscalar("e(df_m)", DFm)
+"DFm"
+DFm
 	st_numscalar("e(h)", h)
 	if (rows(clusts)) {
 		st_global("e(clustvar)", st_local("cluster"))
@@ -1293,7 +1297,6 @@ real matrix _MakeGMMinsts(real scalar N, real scalar T, real scalar NT, real sca
 				p = trunc(p :/ Zeros) :* T + mod(p, Zeros) :+ T - Zeros + 1
 				NewInsts[p,] = J(rows(p), cols(NewInsts), 0)
 			}
-
 			Z[|SubscriptsInst|] = NewInsts
 			ZGMMnames[|SubscriptsInst[,2],(.\.)|] = J(cols(NewInsts), 1, GMM->FullInstSetEq? "Levels" : (orthogonal? "Orthog eq" : "Diff eq")) , 
 			                                          _LF(Lag) :+ (*GMM->BaseNamesAll[GMM->FullInstSetDiffed+1]:+(GMM->collapse? "" : strofreal((GMM->BaseNameTs:+Lag)*tdelta:+tmin,tsfmt)))[|SubscriptsBase[,2]|]
@@ -1302,7 +1305,7 @@ real matrix _MakeGMMinsts(real scalar N, real scalar T, real scalar NT, real sca
 			if (Lag>=0) SubscriptsBase[2,] = SubscriptsBase[2,] - SubscriptsStep
 			if (Lag<0 | !Lag & !GMM->FullInstSetDiffed) SubscriptsBase[1,] = SubscriptsBase[1,] - SubscriptsStep
 		}
-	
+
 		if (GMM->MakeExtraInsts) {		
 			if (GMM->Laglim[1] > 0) { // if both lags positive, start at lag Laglim[1]-1 (as is standard) and search to deeper lags if neceesary
 				Lag = GMM->Laglim[1] - 1
