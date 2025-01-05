@@ -226,7 +226,7 @@ program define xtabond2_stata, eclass
 
 	if "`orthogonal'" != "" {
 		di as err "The orthogonal option is only available in the Mata version of xtabond2."
-		di as err "You need to run xtabond2 without the nomata option, in Stata 10.1 or later."
+		di as err "You need to run xtabond2 without the nomata option, in Stata 11.2 or later."
 		exit 198
 	}
 
