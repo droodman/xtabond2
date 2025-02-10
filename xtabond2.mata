@@ -1,5 +1,5 @@
-*! xtabond2 3.7.1 8 July 2024
-// Copyright (C) 2005-20 David Roodman. May be distributed free.
+*! xtabond2 3.7.2 9 February 2025
+// Copyright (C) 2005-25 David Roodman. May be distributed free.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -664,8 +664,6 @@ real scalar xtabond2_mata() {
 	st_numscalar("e(g_max)", TiMinMax[2])
 	st_numscalar("e(N_g)", NGroups)
 	st_numscalar("e(df_m)", DFm)
-"DFm"
-DFm
 	st_numscalar("e(h)", h)
 	if (rows(clusts)) {
 		st_global("e(clustvar)", st_local("cluster"))
